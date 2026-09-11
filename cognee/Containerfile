@@ -1,0 +1,42 @@
+FROM python:3.12-slim-bookworm
+
+ARG COGNEE_UID=1654
+ARG COGNEE_GID=1654
+
+WORKDIR /app
+
+ENV HTTP_API_HOST=0.0.0.0 \
+    HTTP_API_PORT=8000 \
+    SYSTEM_ROOT_DIRECTORY=/cognee-storage/system \
+    DATA_ROOT_DIRECTORY=/cognee-storage/data \
+    HOME=/cognee-storage \
+    PATH="/opt/cognee-venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt /tmp/cognee-requirements.txt
+
+RUN groupadd --gid "$COGNEE_GID" cognee \
+    && useradd --uid "$COGNEE_UID" --gid "$COGNEE_GID" --home-dir /cognee-storage --no-create-home cognee \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        build-essential \
+        curl \
+        libgomp1 \
+        libpq-dev \
+        python3-venv \
+    && python -m venv /opt/cognee-venv \
+    && /opt/cognee-venv/bin/python -m pip install --no-cache-dir --upgrade pip \
+    && /opt/cognee-venv/bin/python -m pip install --no-cache-dir --requirement /tmp/cognee-requirements.txt \
+    && apt-get purge --yes build-essential libpq-dev \
+    && apt-get autoremove --yes \
+    && rm -rf /var/lib/apt/lists/* /tmp/cognee-requirements.txt \
+    && mkdir -p /cognee-storage/system /cognee-storage/data \
+    && chown -R "$COGNEE_UID:$COGNEE_GID" /cognee-storage /opt/cognee-venv
+
+COPY entrypoint.sh /usr/local/bin/cognee-entrypoint.sh
+RUN chmod 755 /usr/local/bin/cognee-entrypoint.sh
+
+EXPOSE 8000
+
+USER cognee
+ENTRYPOINT ["/usr/local/bin/cognee-entrypoint.sh"]

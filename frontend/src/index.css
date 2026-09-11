@@ -1,0 +1,25 @@
+:root {
+  font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  color: #202322;
+  background: #f3f2ed;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #202322;
+  --muted: #737a76;
+  --line: #d9ddd7;
+  --paper: #fbfcf8;
+  --panel: #f6f7f2;
+  --green: #2c6b56;
+  --green-soft: #dbece2;
+  --coral: #d9674e;
+  --shadow: 0 20px 50px rgba(35, 48, 40, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+
+button, textarea { font: inherit; }
+
+button { cursor: pointer; }

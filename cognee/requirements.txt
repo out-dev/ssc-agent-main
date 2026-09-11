@@ -1,0 +1,1 @@
+cognee[azure,postgres-binary]==1.5.3

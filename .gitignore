@@ -1,0 +1,38 @@
+# Python build and virtual environment output
+**/bin/
+**/obj/
+**/.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+test-results/
+
+# Node, pnpm, and frontend output
+node_modules/
+frontend/dist/
+frontend/.vite/
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+.eslintcache
+.turbo/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local Azure Developer CLI environments
+.azure/
+
+# OS and editor files
+.DS_Store
+.idea/

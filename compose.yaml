@@ -1,0 +1,130 @@
+x-podman:
+  # The backend needs its own user namespace so keep-id can access the
+  # rootless Podman socket. A shared Compose pod would force a private
+  # namespace and prevent access to the socket's owning user/group.
+  in_pod: false
+
+services:
+  ssc-agent:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/ssc-agent:dev
+    depends_on:
+      cognee:
+        condition: service_healthy
+    ports:
+      - "${SSC_AGENT_PORT:-8080}:8080"
+    # The rootless Podman machine owns the socket. keep-id makes the
+    # container process use the same identity, and the supplementary group
+    # grants appuser access without making it root inside the image.
+    userns_mode: keep-id
+    group_add:
+      - "${PODMAN_MACHINE_GID:-1000}"
+    security_opt:
+      - label=disable
+    volumes:
+      - "${PODMAN_SOCKET_PATH:?Set PODMAN_SOCKET_PATH to the Podman API socket}:/run/podman/podman.sock"
+    environment:
+      FOUNDRY_PROJECT_ENDPOINT: ${FOUNDRY_PROJECT_ENDPOINT:-https://ssc-foundery.services.ai.azure.com/api/projects/ssc-proj-default}
+      FOUNDRY_MODEL: ${FOUNDRY_MODEL:-gpt-5.3-codex}
+      DOCKER_SHELL_ENABLED: ${DOCKER_SHELL_ENABLED:-true}
+      DOCKER_SHELL_IMAGE: ${DOCKER_SHELL_IMAGE:-mcr.microsoft.com/dotnet/sdk:8.0}
+      DOCKER_SHELL_MODE: ${DOCKER_SHELL_MODE:-stateless}
+      DOCKER_SHELL_BINARY: ${DOCKER_SHELL_BINARY:-podman}
+      DOCKER_SHELL_TIMEOUT: ${DOCKER_SHELL_TIMEOUT:-30}
+      DOCKER_SHELL_HOST_WORKDIR: ${DOCKER_SHELL_HOST_WORKDIR:-}
+      DOCKER_SHELL_WORKDIR: ${DOCKER_SHELL_WORKDIR:-/tmp}
+      CONTAINER_HOST: ${PODMAN_CONTAINER_HOST:-unix:///run/podman/podman.sock}
+      MSAL_TENANT_ID: ${MSAL_TENANT_ID:-505cca53-5750-4134-9501-8d52d5df3cd1}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:8080}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:-}
+      COGNEE_ENABLED: ${COGNEE_ENABLED:-true}
+      COGNEE_URL: ${COGNEE_URL:-http://cognee:8000}
+      COGNEE_API_KEY: ${COGNEE_API_KEY:-}
+      COGNEE_DATASET: ${COGNEE_DATASET:-ssc_agent_memory}
+      COGNEE_TIMEOUT: ${COGNEE_TIMEOUT:-10}
+      COGNEE_TOP_K: ${COGNEE_TOP_K:-5}
+
+  cognee:
+    build:
+      context: ./cognee
+      dockerfile: Containerfile
+    image: localhost/ssc-agent-cognee:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${COGNEE_PORT:-8000}:8000"
+    volumes:
+      - cognee_system:/cognee-storage/system
+      - cognee_data:/cognee-storage/data
+    environment:
+      DB_PROVIDER: postgres
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-cognee_db}
+      DB_USERNAME: ${POSTGRES_USER:-cognee}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-cognee}
+      CACHE_BACKEND: postgres
+      LLM_PROVIDER: ${LLM_PROVIDER:-azure}
+      LLM_MODEL: ${LLM_MODEL:-azure/gpt-4.1-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_ENDPOINT: ${LLM_ENDPOINT:-https://ssc-foundery.services.ai.azure.com}
+      LLM_API_VERSION: ${LLM_API_VERSION:-2024-12-01-preview}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-openai}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-azure/text-embedding-3-small}
+      EMBEDDING_ENDPOINT: ${EMBEDDING_ENDPOINT:-https://ssc-foundery.services.ai.azure.com/openai/deployments/text-embedding-3-small}
+      EMBEDDING_API_VERSION: ${EMBEDDING_API_VERSION:-2024-12-01-preview}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+      COGNEE_SKIP_CONNECTION_TEST: ${COGNEE_SKIP_CONNECTION_TEST:-true}
+      # Local Compose is a single-user deployment. Set this to true together
+      # with COGNEE_API_KEY for authenticated multi-tenant deployments.
+      ENABLE_BACKEND_ACCESS_CONTROL: ${COGNEE_ENABLE_BACKEND_ACCESS_CONTROL:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  cognee-ui:
+    build:
+      context: ./cognee-ui/cognee-frontend
+      dockerfile: Dockerfile
+    depends_on:
+      cognee:
+        condition: service_healthy
+    ports:
+      - "${COGNEE_UI_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT: "false"
+      NEXT_PUBLIC_LOCAL_API_URL: ${COGNEE_LOCAL_API_URL:-http://localhost:8000}
+    command: npm run dev -- --hostname 0.0.0.0
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cognee}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cognee}
+      POSTGRES_DB: ${POSTGRES_DB:-cognee_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  cognee_system:
+  cognee_data:
+  postgres_data:

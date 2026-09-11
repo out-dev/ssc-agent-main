@@ -1,0 +1,44 @@
+[project]
+name = "ssc-agent-backend"
+version = "1.0.0"
+description = "Python API for the SSC Agent application"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "agent-framework-foundry==1.12.0",
+    "agent-framework-tools==1.0.0b260730",
+    "azure-identity>=1.25.0,<2.0.0",
+    "cognee==1.5.3",
+    "fastapi>=0.116.0,<1.0.0",
+    "httpx>=0.28.0,<1.0.0",
+    "PyJWT[crypto]>=2.10.0,<3.0.0",
+    "pydantic-settings>=2.10.0,<3.0.0",
+    "uvicorn[standard]>=0.35.0,<1.0.0",
+    "agent-framework-ag-ui==1.2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0,<9.0.0",
+    "ruff>=0.12.0,<1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ssc_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.uv]
+default-groups = ["dev"]

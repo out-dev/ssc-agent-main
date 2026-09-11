@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+**/bin
+**/obj
+frontend/node_modules
+frontend/dist
+frontend/.vite
+**/*.user
+**/*.suo
+.env
