@@ -92,20 +92,6 @@ services:
       retries: 3
       start_period: 40s
 
-  cognee-ui:
-    build:
-      context: ./cognee-ui/cognee-frontend
-      dockerfile: Dockerfile
-    depends_on:
-      cognee:
-        condition: service_healthy
-    ports:
-      - "${COGNEE_UI_PORT:-3000}:3000"
-    environment:
-      NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT: "false"
-      NEXT_PUBLIC_LOCAL_API_URL: ${COGNEE_LOCAL_API_URL:-http://localhost:8000}
-    command: npm run dev -- --hostname 0.0.0.0
-
   postgres:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
