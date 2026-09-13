@@ -1,7 +1,6 @@
 from functools import lru_cache
-from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,30 +34,27 @@ class Settings(BaseSettings):
     )
     cognee_timeout: float = Field(default=10.0, validation_alias="COGNEE_TIMEOUT")
     cognee_top_k: int = Field(default=5, validation_alias="COGNEE_TOP_K")
-    docker_shell_enabled: bool = Field(default=False, validation_alias="DOCKER_SHELL_ENABLED")
-    docker_shell_image: str = Field(
-        default="mcr.microsoft.com/azurelinux/base/core:3.0",
-        validation_alias="DOCKER_SHELL_IMAGE",
+    kubernetes_shell_enabled: bool = Field(
+        default=False, validation_alias="KUBERNETES_SHELL_ENABLED"
     )
-    docker_shell_mode: Literal["stateless", "persistent"] = Field(
-        default="stateless",
-        validation_alias="DOCKER_SHELL_MODE",
+    kubernetes_shell_namespace: str = Field(
+        default="ssc-sandbox",
+        validation_alias="KUBERNETES_SHELL_NAMESPACE",
+        pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
     )
-    docker_shell_binary: str = Field(default="podman", validation_alias="DOCKER_SHELL_BINARY")
-    docker_shell_timeout: float = Field(default=30.0, validation_alias="DOCKER_SHELL_TIMEOUT")
-    docker_shell_host_workdir: str | None = Field(
-        default=None,
-        validation_alias="DOCKER_SHELL_HOST_WORKDIR",
+    kubernetes_shell_image: str = Field(
+        default="mcr.microsoft.com/dotnet/sdk:8.0", validation_alias="KUBERNETES_SHELL_IMAGE"
     )
-    docker_shell_workdir: str = Field(default="/tmp", validation_alias="DOCKER_SHELL_WORKDIR")
+    kubernetes_shell_timeout: float = Field(
+        default=30, gt=0, le=600, validation_alias="KUBERNETES_SHELL_TIMEOUT"
+    )
+    kubernetes_shell_startup_timeout: float = Field(
+        default=120, gt=0, le=600, validation_alias="KUBERNETES_SHELL_STARTUP_TIMEOUT"
+    )
+    kubernetes_shell_concurrency: int = Field(
+        default=4, ge=1, le=16, validation_alias="KUBERNETES_SHELL_CONCURRENCY"
+    )
 
-    @field_validator("docker_shell_host_workdir", mode="before")
-    @classmethod
-    def empty_host_workdir_is_unset(cls, value: str | None) -> str | None:
-        """Do not turn an empty environment value into an invalid bind mount."""
-        if value is None or not str(value).strip():
-            return None
-        return str(value)
     msal_tenant_id: str = Field(
         default="13eb42f4-a065-4aed-a3da-ae0114f35f43",
         validation_alias="MSAL_TENANT_ID",
@@ -78,7 +74,6 @@ class Settings(BaseSettings):
             f"https://login.microsoftonline.com/{self.msal_tenant_id}/v2.0",
             f"https://sts.windows.net/{self.msal_tenant_id}/",
         )
-
 
 
 @lru_cache

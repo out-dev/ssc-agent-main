@@ -40,11 +40,14 @@ They use the same Foundry client and authentication dependency, but have
 separate Agent Framework agent profiles. `/api/chat` is retained as a legacy
 JSON endpoint.
 
-The `DockerShellTool` integration is enabled by the Podman Compose setup. It
-runs commands in stateless, isolated containers by default. The backend image
-contains the `podman` client, and Compose connects it to the rootless Podman
-machine socket; see the root `.env.example` for the socket, image, timeout,
-and optional work-directory settings.
+The optional `KubernetesShellTool` runs each shell invocation in a fresh offline
+pod and deletes it afterward. Enable it with `KUBERNETES_SHELL_ENABLED=true`
+inside the cluster; the deployment supplies namespace-scoped service-account
+permissions. Configure `KUBERNETES_SHELL_IMAGE`, `KUBERNETES_SHELL_TIMEOUT`,
+`KUBERNETES_SHELL_STARTUP_TIMEOUT`, and `KUBERNETES_SHELL_CONCURRENCY` as needed.
+The image must include `/bin/sh` and GNU `/usr/bin/timeout`. The default is the
+.NET 8 SDK. Only `/tmp` is writable, and files do not survive an invocation.
+The host development API leaves the shell disabled by default.
 
 `/api/chat` requires a Microsoft Entra bearer token. Temporary development mode
 accepts any valid signed token issued by `MSAL_TENANT_ID`; it checks the signing
@@ -57,7 +60,7 @@ user-scoped memory for the current AG-UI thread (or `/api/chat` `sessionId`) bef
 model call and stores the completed question/answer turn afterward. Configure it with
 `COGNEE_ENABLED`, `COGNEE_URL`, optional `COGNEE_API_KEY`, `COGNEE_DATASET`,
 `COGNEE_TIMEOUT`, and `COGNEE_TOP_K`.
-The local Compose deployment disables Cognee access control by default through
+The kind deployment disables Cognee access control by default through
 `COGNEE_ENABLE_BACKEND_ACCESS_CONTROL=false`; enable it when using an API key
 and multiple Cognee users.
 Memory failures are logged and ignored so Cognee availability does not take down chat.

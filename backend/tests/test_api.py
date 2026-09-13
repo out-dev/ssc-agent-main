@@ -95,7 +95,7 @@ def test_chat_returns_agent_answer_after_authentication(monkeypatch) -> None:
     assert response.json() == {"message": "Hello from the SSC Agent.", "sessionId": None}
 
 
-def test_agent_service_continues_without_shell_when_podman_is_unavailable(monkeypatch) -> None:
+def test_agent_service_continues_without_shell_when_kubernetes_is_unavailable(monkeypatch) -> None:
     class FakeCredential:
         def __init__(self, *args, **kwargs):
             pass
@@ -113,21 +113,18 @@ def test_agent_service_continues_without_shell_when_podman_is_unavailable(monkey
             self.name = kwargs.get("name")
             self.instructions = kwargs.get("instructions")
 
-    class FailingDockerShellTool:
+    class FailingKubernetesShellTool:
         def __init__(self, *args, **kwargs):
-            raise RuntimeError("unable to connect to Podman socket")
+            raise RuntimeError("unable to connect to Kubernetes")
 
     monkeypatch.setattr("ssc_agent.agent_service.DefaultAzureCredential", FakeCredential)
     monkeypatch.setattr("ssc_agent.agent_service.FoundryChatClient", FakeFoundryClient)
-    monkeypatch.setattr("ssc_agent.agent_service.DockerShellTool", FailingDockerShellTool)
+    monkeypatch.setattr("ssc_agent.agent_service.KubernetesShellTool", FailingKubernetesShellTool)
     monkeypatch.setattr("ssc_agent.agent_service.Agent", FakeAgent)
 
     service = AgentService(
         Settings(
-            docker_shell_enabled=True,
-            docker_shell_image="mcr.microsoft.com/dotnet/sdk:8.0",
-            docker_shell_mode="stateless",
-            docker_shell_binary="podman",
+            kubernetes_shell_enabled=True,
         )
     )
 

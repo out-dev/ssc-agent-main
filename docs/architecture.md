@@ -21,24 +21,29 @@ stores the completed turn through `/api/v1/remember/entry`. The Cognee session k
 derived from a hash of the Entra subject and the AG-UI thread ID (or the legacy chat
 `sessionId`), keeping memory durable while preventing users from sharing a session by
 guessing a thread ID. Cognee is accessed over the internal `COGNEE_URL` service URL in
-Compose. Recall and persistence are fail-open and only log a warning when Cognee is
+Kubernetes. Recall and persistence are fail-open and only log a warning when Cognee is
 unavailable.
 
 ## Sandboxed shell tool
 
-`agent-framework-tools` provides the optional `DockerShellTool` integration. It
-is enabled in the Compose development setup. When enabled, the agent gets a
-local shell function through `FoundryChatClient.get_shell_tool`; commands run
-in stateless containers by default so shell state cannot be shared between
-API users. The tool's default sandbox disables networking, runs as a non-root
-user, makes the root filesystem read-only, and applies memory and process
-limits. The backend image contains the Podman client and Compose mounts the
-rootless Podman-machine API socket at `/run/podman/podman.sock`.
+`KubernetesShellTool` exposes a local shell function through
+`FoundryChatClient.get_shell_tool`. Each invocation creates a fresh pod in
+`ssc-sandbox`, polls its status, reads bounded combined stdout/stderr, and returns
+the exit code. GNU timeout limits command execution independently of scheduling;
+a pod deadline and a client deadline also bound startup and execution. The API
+deletes pods on success, failure, and cancellation. A CronJob reaps labeled pods
+older than their deadline plus two minutes, including pods orphaned by API crashes.
 
-The socket is a powerful host control interface. This setup is intended for
-controlled local development, not as a production isolation boundary. On
-macOS, the socket path in Compose is the Linux path inside the Podman machine,
-not the temporary macOS proxy path returned by `podman machine inspect`.
+Sandbox pods have no service-account token, host mounts, or application secrets.
+They run as a non-root user with dropped capabilities, a read-only root filesystem,
+limited CPU/memory/storage, and writable temporary storage. A namespace-wide policy
+denies ingress and egress, enforced by the supplied kube-network-policies controller.
+A node-local seccomp profile additionally disallows IP sockets from process startup,
+closing the observed network-policy enforcement race for newly started pods.
+The backend service account can create/get/delete pods and read logs only in the
+sandbox namespace. The separate reaper account can list/delete pods there.
+
+See [Kubernetes deployment](kubernetes.md) for operational details and limitations.
 
 ## Authentication
 
@@ -83,6 +88,14 @@ Playwright is the frontend end-to-end UI testing framework. Tests live in
 
 `Containerfile` builds the frontend and backend independently, copies the Vite output into the Python runtime, and ships the `ssc-agent` runtime image. The API serves the SPA fallback, so the browser only needs one origin in container deployments.
 
-For a clean development build, recreate `backend/.venv`, run `uv sync --frozen`, reinstall the pnpm workspace, regenerate the OpenAPI client, and run the frontend build. For a clean Podman build, run `podman compose down`, then `podman compose build --no-cache --pull=always`, followed by `podman compose up -d`. The normal clean container rebuild preserves named data volumes; `podman compose down -v` is an explicit data-reset operation that removes the local PostgreSQL and Cognee data.
+`scripts/deploy-kind.ps1` builds the app and Cognee images with Podman, loads image
+archives into the selected kind cluster, applies Kustomize manifests, imports
+allowlisted `.env` settings, and waits for rollouts. Credentials are sent directly
+to a Kubernetes Secret and are not written to generated manifest files. The app
+serves the frontend and API through one origin. PostgreSQL uses pgvector/pgvector:pg17.
 
-The `cognee/` directory contains the `Containerfile`, Python requirements, and entrypoint for the `ssc-agent-cognee` runtime image. `compose.yaml` builds and runs it as a separate `cognee` service alongside PostgreSQL, which uses the `pgvector/pgvector:pg17` image. Cognee uses PostgreSQL for its relational database and session cache through the `DB_*` settings. Cognee's LLM and embedding clients use the native Azure API-key settings `LLM_API_KEY` and `EMBEDDING_API_KEY`; its managed-identity option is not configured. The Python agent independently uses `DefaultAzureCredential` for its Foundry project client. Cognee's vector store uses the Azure `text-embedding-3-small` deployment. Named volumes retain PostgreSQL data and Cognee's default graph store across restarts.
+PVCs retain PostgreSQL and Cognee system/data files across redeployments. This
+migration starts with fresh storage; former Compose volumes are not imported or
+deleted. Cognee retains its Azure API-key authentication for LLMs and embeddings;
+the app independently uses DefaultAzureCredential. The Cognee UI is no longer
+part of the repository or deployment.

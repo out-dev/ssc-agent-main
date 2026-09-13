@@ -36,10 +36,8 @@ COPY --from=backend-build /workspace/backend/.venv /app/.venv
 COPY --from=backend-build /workspace/backend/src /app/src
 COPY --from=frontend-build /workspace/frontend/dist /app/frontend-dist
 
-# DockerShellTool uses the Podman client to submit isolated command containers
-# to the host Podman API socket mounted by Compose.
 RUN apt-get update \
-    && apt-get install --no-install-recommends --yes ca-certificates podman \
+    && apt-get install --no-install-recommends --yes ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app

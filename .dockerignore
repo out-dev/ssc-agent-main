@@ -9,3 +9,7 @@ frontend/.vite
 **/*.user
 **/*.suo
 .env
+.env.*
+.tools
+backend/.venv
+node_modules

@@ -3,10 +3,10 @@ import logging
 
 from agent_framework import Agent, AgentSession
 from agent_framework.foundry import FoundryChatClient
-from agent_framework.tools import DockerShellTool
 from azure.identity.aio import DefaultAzureCredential
 
 from .config import Settings
+from .kubernetes_shell import KubernetesShellTool
 from .memory import CogneeClient, CogneeMemoryProvider
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class AgentService:
         self._client: FoundryChatClient | None = None
         self._agent: Agent | None = None
         self._agents: dict[str, Agent] = {}
-        self._shell: DockerShellTool | None = None
+        self._shell: KubernetesShellTool | None = None
         self._sessions: dict[str, AgentSession] = {}
         self._initialization_lock = asyncio.Lock()
         self._session_lock = asyncio.Lock()
@@ -62,21 +62,15 @@ class AgentService:
             )
 
         tools = None
-        if self._settings.docker_shell_enabled:
+        if self._settings.kubernetes_shell_enabled:
             if self._shell is None:
                 try:
-                    self._shell = DockerShellTool(
-                        image=self._settings.docker_shell_image,
-                        mode=self._settings.docker_shell_mode,
-                        docker_binary=self._settings.docker_shell_binary,
-                        host_workdir=self._settings.docker_shell_host_workdir,
-                        workdir=self._settings.docker_shell_workdir,
-                        timeout=self._settings.docker_shell_timeout,
-                        approval_mode="never_require",
+                    self._shell = KubernetesShellTool(
+                        self._settings,
                     )
                 except Exception:
                     logger.warning(
-                        "DockerShellTool initialization failed; continuing without shell tool.",
+                        "KubernetesShellTool initialization failed; continuing without shell tool.",
                         exc_info=True,
                     )
                     self._shell = None
@@ -111,7 +105,6 @@ class AgentService:
 
         async with self._initialization_lock:
             return self._agents.get(agent_id) or self._create_agent(agent_id)
-
 
     async def _get_session(self, session_id: str | None) -> AgentSession:
         if not session_id:
