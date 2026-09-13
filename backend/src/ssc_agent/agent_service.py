@@ -64,16 +64,24 @@ class AgentService:
         tools = None
         if self._settings.docker_shell_enabled:
             if self._shell is None:
-                self._shell = DockerShellTool(
-                    image=self._settings.docker_shell_image,
-                    mode=self._settings.docker_shell_mode,
-                    docker_binary=self._settings.docker_shell_binary,
-                    host_workdir=self._settings.docker_shell_host_workdir,
-                    workdir=self._settings.docker_shell_workdir,
-                    timeout=self._settings.docker_shell_timeout,
-                    approval_mode="never_require",
-                )
-            tools = [self._client.get_shell_tool(func=self._shell.as_function())]
+                try:
+                    self._shell = DockerShellTool(
+                        image=self._settings.docker_shell_image,
+                        mode=self._settings.docker_shell_mode,
+                        docker_binary=self._settings.docker_shell_binary,
+                        host_workdir=self._settings.docker_shell_host_workdir,
+                        workdir=self._settings.docker_shell_workdir,
+                        timeout=self._settings.docker_shell_timeout,
+                        approval_mode="never_require",
+                    )
+                except Exception:
+                    logger.warning(
+                        "DockerShellTool initialization failed; continuing without shell tool.",
+                        exc_info=True,
+                    )
+                    self._shell = None
+            if self._shell is not None:
+                tools = [self._client.get_shell_tool(func=self._shell.as_function())]
 
         agent = Agent(
             client=self._client,
