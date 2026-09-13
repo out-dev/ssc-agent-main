@@ -3,6 +3,10 @@
 The backend is a FastAPI application managed with `uv`. It uses the Python
 Microsoft Agent Framework Foundry integration for agent calls.
 
+See [How SSC Agent works](../docs/system-guide.md) for request flow, identity,
+memory/session behavior, sandbox execution, and a source map. Operational commands
+are in the [kind deployment runbook](../docs/kubernetes.md).
+
 ## Development
 
 From the repository root:
@@ -47,7 +51,9 @@ permissions. Configure `KUBERNETES_SHELL_IMAGE`, `KUBERNETES_SHELL_TIMEOUT`,
 `KUBERNETES_SHELL_STARTUP_TIMEOUT`, and `KUBERNETES_SHELL_CONCURRENCY` as needed.
 The image must include `/bin/sh` and GNU `/usr/bin/timeout`. The default is the
 .NET 8 SDK. Only `/tmp` is writable, and files do not survive an invocation.
-The host development API leaves the shell disabled by default.
+The host development API leaves the shell disabled by default. Enabling it
+requires the installed node-local offline seccomp profile as well as RBAC;
+namespace-wide network policy alone does not provide the required startup isolation.
 
 `/api/chat` requires a Microsoft Entra bearer token. Temporary development mode
 accepts any valid signed token issued by `MSAL_TENANT_ID`; it checks the signing
@@ -55,14 +61,20 @@ key, issuer, tenant ID, and expiry but does not require a registered API
 resource, audience, or scope. The frontend sends the signed Entra ID token from
 the normal `openid profile email` login.
 
-Both agent profiles use Cognee's Python SDK as a durable conversation-memory provider. It recalls
-user-scoped memory for the current AG-UI thread (or `/api/chat` `sessionId`) before the
-model call and stores the completed question/answer turn afterward. Configure it with
-`COGNEE_ENABLED`, `COGNEE_URL`, optional `COGNEE_API_KEY`, `COGNEE_DATASET`,
-`COGNEE_TIMEOUT`, and `COGNEE_TOP_K`.
+Both agent profiles use Cognee's remote Python SDK for durable conversation memory.
+They recall user-scoped memory before a run and store completed question/answer
+turns afterward. Keys use the framework session ID; AG-UI uses its thread ID, while
+the legacy endpoint maps `sessionId` to a process-local framework session object.
+That legacy cache is not qualified by user and is lost on restart. Both profiles
+currently use the same `shared` durable-memory namespace.
+
+Configure memory with `COGNEE_ENABLED`, `COGNEE_URL`, optional `COGNEE_API_KEY`,
+`COGNEE_DATASET`, and `COGNEE_TOP_K`. `COGNEE_TIMEOUT` is declared in settings but
+is not currently enforced by the SDK wrapper. See the detailed guide for the
+distinction between durable recall and restored conversation history.
 The kind deployment disables Cognee access control by default through
-`COGNEE_ENABLE_BACKEND_ACCESS_CONTROL=false`; enable it when using an API key
-and multiple Cognee users.
+`COGNEE_ENABLE_BACKEND_ACCESS_CONTROL=false`. Enabling it requires corresponding
+Cognee user/key provisioning; setting a key alone does not complete that setup.
 Memory failures are logged and ignored so Cognee availability does not take down chat.
 
 After signing in, use the **Test backend connection** button. It calls the

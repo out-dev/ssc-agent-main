@@ -2,6 +2,14 @@
 
 Monorepo for a Python API built with FastAPI and Microsoft Agent Framework, a React frontend, and project documentation.
 
+## Documentation
+
+- [Architecture overview](docs/architecture.md): components and runtime boundaries.
+- [How everything works together](docs/system-guide.md): detailed request flows,
+  authentication, conversation memory, sandbox lifecycle, configuration, and storage.
+- [Kubernetes runbook](docs/kubernetes.md): deploy, access, update, inspect, and troubleshoot.
+- [Backend development](backend/README.md) and [frontend development](frontend/README.md).
+
 ## Repository layout
 
 ```text
@@ -26,7 +34,12 @@ Prerequisites: Python 3.11+, uv, Node.js 24+, pnpm 10+, Podman, kind, and kubect
 3. In a second terminal, generate the typed frontend client with `pnpm api:generate`.
 4. Start the frontend with `pnpm dev` and open the Vite URL.
 
-The frontend requires Microsoft Entra ID sign-in through MSAL. The supplied tenant and SPA client IDs are configured by default; they can be overridden with `VITE_MSAL_TENANT_ID` and `VITE_MSAL_CLIENT_ID` in the root `.env`. Register each frontend origin (`http://localhost:5173` for Vite and `http://localhost:8080` for the container) as a SPA redirect URI in the Entra app registration. No custom API scope is required in temporary tenant-only mode.
+The frontend requires Microsoft Entra ID sign-in through MSAL. Local Vite reads
+`VITE_MSAL_TENANT_ID` and `VITE_MSAL_CLIENT_ID` from the root `.env`. The container
+build currently uses source defaults; runtime `.env` imports do not change the
+compiled frontend. See [frontend configuration](frontend/README.md). Register each
+origin (`http://localhost:5173` for Vite and `http://localhost:8080` for kind) as a
+SPA redirect URI in Entra. The current backend uses tenant-only token validation.
 
 The API publishes its OpenAPI document at `/openapi/v1.json`. Orval generates the client under `frontend/src/api` from that document. The Vite proxy forwards `/api` and `/openapi` to port 5080. `/api/chat` requires a bearer token from the configured tenant. After login, use **Test backend connection** to run the protected `/api/test-agent` smoke check through Microsoft Agent Framework.
 
