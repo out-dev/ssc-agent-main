@@ -392,11 +392,10 @@ readout. The Activity log page is currently a placeholder, not a durable tool lo
 
 ## 9. Build, deploy, and storage lifecycle
 
-[deploy-kind.ps1](../scripts/deploy-kind.ps1) targets an existing cluster using
-the explicit context `kind-<Cluster>` and performs these steps:
+The deployment scripts ([deploy-kind.ps1](../scripts/deploy-kind.ps1) for Windows PowerShell and [deploy-kind.sh](../scripts/deploy-kind.sh) for macOS/Linux Bash) target an existing cluster using the explicit context `kind-<Cluster>` and perform these steps:
 
-1. Check access and build app/Cognee images with Podman unless `-SkipBuild` is set.
-2. Install the offline profile on amd64 kind nodes and label them.
+1. Check access and build app/Cognee images with Podman unless `-SkipBuild` / `--skip-build` is set.
+2. Install the offline seccomp profile on amd64 or arm64/aarch64 kind nodes and label them.
 3. Export image archives, load them into kind, then remove the temporary archives.
 4. Apply the network-policy controller and wait for its rollout.
 5. Apply namespaces/RBAC, default ConfigMaps, and imported configuration/Secrets.
@@ -465,7 +464,8 @@ block those control targets require corresponding test changes.
 | [deploy/kind/workloads.yaml](../deploy/kind/workloads.yaml) | Services, workloads, probes and volumes |
 | [deploy/kind/namespaces-rbac.yaml](../deploy/kind/namespaces-rbac.yaml) | Namespaces, permissions, policy and quota |
 | [deploy/kind/seccomp-offline.json](../deploy/kind/seccomp-offline.json) | Offline syscall profile |
-| [scripts/deploy-kind.ps1](../scripts/deploy-kind.ps1) | Deployment order and image loading |
+| [scripts/deploy-kind.ps1](../scripts/deploy-kind.ps1) | Deployment order and image loading on Windows (PowerShell) |
+| [scripts/deploy-kind.sh](../scripts/deploy-kind.sh) | Deployment order and image loading on macOS / Linux (Bash) |
 | [scripts/configure_kind.py](../scripts/configure_kind.py) | `.env` import rules and Secret application |
 
 For operational commands and failure diagnosis, continue with the

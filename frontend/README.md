@@ -11,7 +11,7 @@ Read [How SSC Agent works](../docs/system-guide.md) for the full request flow an
 Run these commands from the repository root. Start the API on port 5080 first;
 Vite proxies `/api` and `/openapi` to it.
 
-```powershell
+```bash
 pnpm install --frozen-lockfile
 pnpm api:generate
 pnpm dev
@@ -67,7 +67,7 @@ Never put server-side credentials in `VITE_*` variables.
 
 From the repository root:
 
-```powershell
+```bash
 pnpm build
 pnpm lint
 pnpm --dir frontend exec playwright install chromium

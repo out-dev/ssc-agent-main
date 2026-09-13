@@ -22,12 +22,15 @@ docs/                     Architecture and operational notes
 Containerfile             Image build for the API and frontend
 cognee/                   Cognee image and runtime files
 deploy/kind/              Kubernetes manifests for the existing kind cluster
-scripts/deploy-kind.ps1   Build, load, and deploy with Podman and kind
+scripts/deploy-kind.ps1   Build, load, and deploy on Windows (PowerShell)
+scripts/deploy-kind.sh    Build, load, and deploy on macOS / Linux (Bash)
 ```
 
 ## Local development
 
-Prerequisites: Python 3.11+, uv, Node.js 24+, pnpm 10+, Podman, kind, and kubectl.
+Prerequisites: Python 3.11+, uv, Node.js 24+, pnpm 10+, Podman (or Docker Desktop), kind, and kubectl.
+- **Windows**: Install via `winget` or installer packages; use PowerShell or Command Prompt.
+- **macOS**: Install via Homebrew (`brew install podman kind kubectl uv node pnpm azure-cli`) or native packages; use zsh or bash.
 
 1. Authenticate for local Foundry calls with `az login` or another `DefaultAzureCredential` supported provider.
 2. Start the API with `uv run --directory backend uvicorn ssc_agent.main:app --reload --port 5080`.
@@ -102,12 +105,24 @@ and hosts the existing kind node; the application uses the Kubernetes API.
 The former Cognee UI submodule is removed.
 
 See [the kind deployment guide](docs/kubernetes.md) for setup, configuration,
-network isolation, validation, and cleanup. From PowerShell:
+network isolation, validation, and cleanup.
+
+**On Windows (PowerShell):**
 
 ```powershell
 Copy-Item .env.example .env # only if you do not already have .env
 # Fill in your Azure credentials, Cognee API keys, and PostgreSQL password.
 ./scripts/deploy-kind.ps1 -Cluster kind-cluster
+kubectl --context kind-kind-cluster -n ssc-agent port-forward service/ssc-agent 8080:8080
+```
+
+**On macOS (Bash/Zsh):**
+
+```bash
+cp .env.example .env # only if you do not already have .env
+# Fill in your Azure credentials, Cognee API keys, and PostgreSQL password.
+chmod +x ./scripts/deploy-kind.sh
+./scripts/deploy-kind.sh --cluster kind-cluster
 kubectl --context kind-kind-cluster -n ssc-agent port-forward service/ssc-agent 8080:8080
 ```
 

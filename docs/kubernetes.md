@@ -7,14 +7,38 @@ mounted into application pods. The former Cognee UI submodule is removed.
 
 ## Deploy
 
-Install Podman, kind, kubectl, uv, and PowerShell. Start your existing cluster.
-The helper accepts kubectl on PATH or `.tools/kubectl.exe`. Copy `.env.example`
-to `.env` if needed, then supply a PostgreSQL password, Azure service-principal
-credentials for the app, and LLM/embedding API keys for Cognee. Host `az login`
-credentials are not automatically available inside Kubernetes pods.
+Install Podman (or Docker Desktop), kind, kubectl, and uv.
+- **Windows**: Install PowerShell, Podman, kind, kubectl, and uv.
+- **macOS**: Install bash/zsh, Podman (or Docker Desktop), kind, kubectl, and uv (e.g. via `brew install podman kind kubectl uv`).
+
+Start your existing kind cluster. The helpers accept kubectl on PATH or `.tools/kubectl` (`.tools/kubectl.exe` on Windows). Copy `.env.example` to `.env` if needed, then supply a PostgreSQL password, Azure service-principal credentials for the app, and LLM/embedding API keys for Cognee. Host `az login` credentials are not automatically available inside Kubernetes pods.
+
+**On Windows (PowerShell):**
 
 ```powershell
 ./scripts/deploy-kind.ps1 -Cluster kind-cluster
+kubectl --context kind-kind-cluster -n ssc-agent port-forward service/ssc-agent 8080:8080
+```
+
+To perform a **clean deployment** on Windows (tearing down old pods, previous PVCs, persistent volumes, and wiping the shared workspace state):
+
+```powershell
+./scripts/deploy-kind.ps1 -Cluster kind-cluster -Clean
+kubectl --context kind-kind-cluster -n ssc-agent port-forward service/ssc-agent 8080:8080
+```
+
+**On macOS (Bash/Zsh):**
+
+```bash
+chmod +x ./scripts/deploy-kind.sh
+./scripts/deploy-kind.sh --cluster kind-cluster
+kubectl --context kind-kind-cluster -n ssc-agent port-forward service/ssc-agent 8080:8080
+```
+
+To perform a **clean deployment** on macOS:
+
+```bash
+./scripts/deploy-kind.sh --cluster kind-cluster --clean
 kubectl --context kind-kind-cluster -n ssc-agent port-forward service/ssc-agent 8080:8080
 ```
 
@@ -22,12 +46,13 @@ Open <http://localhost:8080>. Register that SPA redirect origin in the Entra app
 registration. Cognee and PostgreSQL remain internal; optionally forward
 `service/cognee 8000:8000` to access the Cognee API documentation.
 
-The script builds images from the two Containerfiles, imports image archives into
-kind, installs the network-policy controller, applies `deploy/kind`, imports
-allowlisted configuration from `.env`, restarts the app/Cognee, and runs the live sandbox smoke tests. Image tags are
-local development tags with `IfNotPresent`; use this script to reload new builds.
-`-SkipBuild` reuses images already built in Podman and still reloads them into kind.
-The script always uses an explicit context. Secrets are passed over stdin rather
+The deployment scripts build images from the two Containerfiles, import image archives into
+kind, install the network-policy controller, apply `deploy/kind`, import
+allowlisted configuration from `.env`, restart the app/Cognee, and run the live sandbox smoke tests. Image tags are
+local development tags with `IfNotPresent`; use these scripts to reload new builds.
+`-SkipBuild` / `--skip-build` reuses images already built in Podman and still reloads them into kind.
+`-Clean` / `--clean` wipes existing workloads, persistent volume claims, and node workspace storage before redeploying.
+The scripts always use an explicit context. Secrets are passed over stdin rather
 than command-line arguments or generated files. Do not commit `.env`.
 
 ## Storage and configuration
@@ -72,7 +97,7 @@ IPv4, IPv6, packet, and netlink sockets are unavailable, including IP loopback.
 Unix-domain sockets remain available. The helper installs the profile in each
 kind node's kubelet seccomp directory, then labels that node for sandbox
 scheduling. A missing profile prevents container startup. The supplied profile
-supports amd64 nodes; the script rejects other architectures. See the
+supports amd64 and arm64/aarch64 nodes (including Apple Silicon Macs); the scripts reject unsupported architectures. See the
 [Kubernetes seccomp documentation](https://kubernetes.io/docs/reference/node/seccomp/).
 Verify network denial after changes to the cluster or profile.
 
@@ -86,6 +111,8 @@ this migration does not claim to preserve the old 256-process container limit.
 
 ## Verify and operate
 
+**On Windows (PowerShell):**
+
 ```powershell
 kubectl --context kind-kind-cluster -n ssc-agent get pods,pvc
 kubectl --context kind-kind-cluster -n ssc-agent logs deployment/ssc-agent
@@ -95,6 +122,19 @@ uv run --directory backend pytest
 uv run --directory backend ruff check .
 pnpm build
 Get-Content -Raw scripts/smoke_kind.py | kubectl --context kind-kind-cluster -n ssc-agent exec -i deployment/ssc-agent -- python -
+```
+
+**On macOS (Bash/Zsh):**
+
+```bash
+kubectl --context kind-kind-cluster -n ssc-agent get pods,pvc
+kubectl --context kind-kind-cluster -n ssc-agent logs deployment/ssc-agent
+kubectl --context kind-kind-cluster -n ssc-sandbox get pods
+curl http://localhost:8080/health
+uv run --directory backend pytest
+uv run --directory backend ruff check .
+pnpm build
+cat scripts/smoke_kind.py | kubectl --context kind-kind-cluster -n ssc-agent exec -i deployment/ssc-agent -- python -
 ```
 
 After signing in, use **Test backend connection**, then ask the agent to run a
