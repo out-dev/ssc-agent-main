@@ -1,7 +1,7 @@
 import type { Configuration, RedirectRequest } from '@azure/msal-browser'
 
-const tenantId = import.meta.env.VITE_MSAL_TENANT_ID || '505cca53-5750-4134-9501-8d52d5df3cd1'
-const clientId = import.meta.env.VITE_MSAL_CLIENT_ID || '74ecbe9f-2767-4fc9-848d-c2232cf1311a'
+const tenantId = import.meta.env.VITE_MSAL_TENANT_ID || '13eb42f4-a065-4aed-a3da-ae0114f35f43'
+const clientId = import.meta.env.VITE_MSAL_CLIENT_ID || '5a188e1c-6bda-4c95-a834-2c8a0388db88'
 export const loginScopes = ['openid', 'profile', 'email']
 
 export const msalConfig: Configuration = {

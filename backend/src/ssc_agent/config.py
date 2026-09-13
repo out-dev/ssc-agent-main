@@ -60,7 +60,7 @@ class Settings(BaseSettings):
             return None
         return str(value)
     msal_tenant_id: str = Field(
-        default="505cca53-5750-4134-9501-8d52d5df3cd1",
+        default="13eb42f4-a065-4aed-a3da-ae0114f35f43",
         validation_alias="MSAL_TENANT_ID",
     )
     cors_allowed_origins: str = Field(

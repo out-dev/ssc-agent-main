@@ -9,7 +9,9 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from jwt.algorithms import RSAAlgorithm
 
+from ssc_agent.agent_service import AgentService
 from ssc_agent.auth import require_current_user, token_validator
+from ssc_agent.config import Settings
 from ssc_agent.main import agent_service, app
 
 
@@ -91,6 +93,49 @@ def test_chat_returns_agent_answer_after_authentication(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"message": "Hello from the SSC Agent.", "sessionId": None}
+
+
+def test_agent_service_continues_without_shell_when_podman_is_unavailable(monkeypatch) -> None:
+    class FakeCredential:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeFoundryClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_shell_tool(self, func):
+            return func
+
+    class FakeAgent:
+        def __init__(self, *args, **kwargs):
+            self.tools = kwargs.get("tools")
+            self.name = kwargs.get("name")
+            self.instructions = kwargs.get("instructions")
+
+    class FailingDockerShellTool:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("unable to connect to Podman socket")
+
+    monkeypatch.setattr("ssc_agent.agent_service.DefaultAzureCredential", FakeCredential)
+    monkeypatch.setattr("ssc_agent.agent_service.FoundryChatClient", FakeFoundryClient)
+    monkeypatch.setattr("ssc_agent.agent_service.DockerShellTool", FailingDockerShellTool)
+    monkeypatch.setattr("ssc_agent.agent_service.Agent", FakeAgent)
+
+    service = AgentService(
+        Settings(
+            docker_shell_enabled=True,
+            docker_shell_image="mcr.microsoft.com/dotnet/sdk:8.0",
+            docker_shell_mode="stateless",
+            docker_shell_binary="podman",
+        )
+    )
+
+    returned_agent = service._create_agent("ssc-agent")
+
+    assert returned_agent is not None
+    assert service._shell is None
+    assert returned_agent.tools is None
 
 
 def test_token_from_configured_tenant_is_accepted_without_api_scope(monkeypatch) -> None:
