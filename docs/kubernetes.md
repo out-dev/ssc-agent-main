@@ -32,13 +32,15 @@ than command-line arguments or generated files. Do not commit `.env`.
 
 ## Storage and configuration
 
-The initial deployment uses fresh 5 GiB PVCs for PostgreSQL and Cognee. The cluster
-must have a default dynamic storage provisioner (kind's local-path provisioner is
-supported). Rebuilds retain data. Deleting PVCs, the namespace, or the kind cluster
+The initial deployment uses 5 GiB PVCs for PostgreSQL and Cognee, as well as a
+shared `workspace-storage` PVC for the backend application and sandbox pods.
+Rebuilds retain data. Deleting PVCs, the namespace, or the kind cluster
 removes local data; former Podman volumes are left untouched.
 
 ConfigMaps in `configmaps.yaml` hold defaults; `.env` can override their allowlisted
-keys. Internal service addresses and the sandbox namespace are deployment-owned.
+keys, including `WORKSPACE_DIR` (or `WORKSPACE_PATH`), `WORKSPACE_PVC`,
+`KUBERNETES_SHELL_WORKSPACE_MOUNT_PATH`, and `KUBERNETES_SHELL_WORKING_DIR`.
+Internal service addresses and the sandbox namespace are deployment-owned.
 Legacy `DOCKER_SHELL_*` and `PODMAN_*` variables are ignored. The host development
 API keeps its shell disabled; Kubernetes shell execution requires in-cluster
 service-account credentials. The default sandbox image is the .NET 8 SDK and must
@@ -46,8 +48,9 @@ provide `/bin/sh` and GNU `/usr/bin/timeout` if replaced.
 
 ## Sandbox lifecycle and networking
 
-Every invocation receives a new pod and a writable `/tmp` emptyDir. All files
-are discarded afterward. Combine commands into one invocation when they need
+Every invocation receives an isolated sandbox pod with a writable `/tmp` emptyDir
+and the shared workspace mounted at the configured path (default `/workspace`).
+Commands run directly within the workspace. Combine commands into one invocation when they need
 shared files. Command execution defaults to 30 seconds; startup has an additional
 120-second allowance. Output combines stdout/stderr and returns at most
 64 KiB from the start of the log plus the exit code. Four invocations can run concurrently per backend.

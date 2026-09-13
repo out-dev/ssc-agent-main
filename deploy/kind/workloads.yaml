@@ -84,6 +84,13 @@ spec:
           periodSeconds: 30
           timeoutSeconds: 5
           failureThreshold: 3
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: workspace-storage
       serviceAccountName: ssc-agent
   strategy:
     type: Recreate
@@ -99,6 +106,75 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ssc-workspace
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: workspace-pv-agent
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ssc-workspace
+  hostPath:
+    path: /var/lib/ssc-workspace
+    type: DirectoryOrCreate
+  claimRef:
+    namespace: ssc-agent
+    name: workspace-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: workspace-pv-sandbox
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ssc-workspace
+  hostPath:
+    path: /var/lib/ssc-workspace
+    type: DirectoryOrCreate
+  claimRef:
+    namespace: ssc-sandbox
+    name: workspace-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-storage
+  namespace: ssc-agent
+spec:
+  storageClassName: ssc-workspace
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-storage
+  namespace: ssc-sandbox
+spec:
+  storageClassName: ssc-workspace
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

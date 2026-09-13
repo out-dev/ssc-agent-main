@@ -132,7 +132,9 @@ def test_agent_service_continues_without_shell_when_kubernetes_is_unavailable(mo
 
     assert returned_agent is not None
     assert service._shell is None
-    assert returned_agent.tools is None
+    assert returned_agent.tools is not None
+    assert len(returned_agent.tools) == 4
+    assert all(tool.name != "run_shell" for tool in returned_agent.tools)
 
 
 def test_token_from_configured_tenant_is_accepted_without_api_scope(monkeypatch) -> None:

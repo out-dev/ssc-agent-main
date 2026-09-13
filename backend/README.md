@@ -44,16 +44,20 @@ They use the same Foundry client and authentication dependency, but have
 separate Agent Framework agent profiles. `/api/chat` is retained as a legacy
 JSON endpoint.
 
-The optional `KubernetesShellTool` runs each shell invocation in a fresh offline
-pod and deletes it afterward. Enable it with `KUBERNETES_SHELL_ENABLED=true`
+The optional `KubernetesShellTool` runs shell invocations in isolated offline
+pods in the sandbox namespace. Enable it with `KUBERNETES_SHELL_ENABLED=true`
 inside the cluster; the deployment supplies namespace-scoped service-account
 permissions. Configure `KUBERNETES_SHELL_IMAGE`, `KUBERNETES_SHELL_TIMEOUT`,
 `KUBERNETES_SHELL_STARTUP_TIMEOUT`, and `KUBERNETES_SHELL_CONCURRENCY` as needed.
-The image must include `/bin/sh` and GNU `/usr/bin/timeout`. The default is the
-.NET 8 SDK. Only `/tmp` is writable, and files do not survive an invocation.
-The host development API leaves the shell disabled by default. Enabling it
-requires the installed node-local offline seccomp profile as well as RBAC;
-namespace-wide network policy alone does not provide the required startup isolation.
+The image includes the .NET 8 SDK for building, running, and testing code.
+
+Both the agent service and sandbox pods share access to a configurable workspace:
+- `WORKSPACE_DIR` (or `WORKSPACE_PATH`, default `/workspace`): local directory path accessed by the agent service for workspace file tools (`write_file`, `read_file`, `list_files`, `delete_file`).
+- `WORKSPACE_PVC` (default `workspace-storage`): PersistentVolumeClaim mounted into the backend and sandbox pods.
+- `KUBERNETES_SHELL_WORKSPACE_MOUNT_PATH` (default `/workspace`): path where the workspace is mounted in sandbox pods.
+- `KUBERNETES_SHELL_WORKING_DIR` (default `/workspace`): working directory inside sandbox pods.
+
+This shared space allows the coding agent to create and modify project files, and execute .NET CLI build, test, and run commands in the sandbox to verify code changes.
 
 `/api/chat` requires a Microsoft Entra bearer token. Temporary development mode
 accepts any valid signed token issued by `MSAL_TENANT_ID`; it checks the signing

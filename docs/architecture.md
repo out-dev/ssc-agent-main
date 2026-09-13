@@ -57,13 +57,17 @@ is process-local, keyed only by supplied `sessionId`, and creates framework sess
 IDs separately; it is not a durable, user-qualified session registry. These
 behaviors are detailed in the [state and memory walkthrough](system-guide.md).
 
-## Shell execution and isolation
+## Shell execution and workspace
 
 `KubernetesShellTool` submits a plain Pod for each invocation, polls status, reads
 up to 64 KiB of combined logs, and returns the exit code. The pod uses the .NET 8
 SDK, a writable `/tmp`, resource limits, non-root execution, dropped capabilities,
-and a read-only root filesystem. It receives no application secrets, host mounts,
-or service-account token. Files are discarded after each invocation.
+and a read-only root filesystem with the shared workspace mounted at the configured path
+(default `/workspace`). It receives no application secrets or service-account token.
+
+The agent service and sandbox pods share access to a configurable workspace:
+- `WorkspaceManager` provides file tools (`write_file`, `read_file`, `list_files`, `delete_file`) for creating and modifying project files.
+- The sandbox pod executes in the shared workspace, enabling the coding agent to create, build, test, and debug code (e.g. `dotnet new`, `dotnet build`, `dotnet test`, `dotnet run`).
 
 A deny-all NetworkPolicy and a node-local seccomp profile keep pods offline.
 The profile blocks IP socket creation from process startup, including loopback,
@@ -84,8 +88,8 @@ runs live sandbox smoke checks. Port forwarding is a separate host process.
 
 The app and Cognee use single-replica Deployments with `Recreate`; PostgreSQL uses
 a StatefulSet. Cognee waits for PostgreSQL readiness through an init container.
-Separate 5 GiB PVCs preserve the database and Cognee system/data directories across
-pod replacement. The backend has no PVC, and sandbox pods use `emptyDir` storage.
+Persistent volumes and PVCs preserve the database, Cognee system/data directories,
+and the shared workspace across pod replacement.
 Deleting the local kind cluster is not a data-preserving operation.
 
 `/health` verifies only the API process. The authenticated connection-test endpoint

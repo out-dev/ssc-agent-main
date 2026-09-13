@@ -57,6 +57,18 @@ async def main():
             pass
         print("PASS: cancellation")
 
+        # Verify shared workspace communication between agent service and sandbox pod
+        from ssc_agent.workspace import WorkspaceManager
+
+        workspace = WorkspaceManager(shell.settings.workspace_dir)
+        workspace.write_file("smoke-shared.txt", "agent-created-content\n")
+        result = await shell.run("cat smoke-shared.txt && echo sandbox-appended >> smoke-shared.txt")
+        assert "Exit code: 0" in result and "agent-created-content" in result, result
+        read_back = workspace.read_file("smoke-shared.txt")
+        assert "agent-created-content" in read_back and "sandbox-appended" in read_back, read_back
+        workspace.delete_file("smoke-shared.txt")
+        print("PASS: shared workspace read/write between agent and sandbox")
+
         # Use the application image's Python for precise TCP and UDP probes.
         # Its pod security and namespace policy are identical to the SDK sandbox.
         shell.settings.kubernetes_shell_image = "localhost/ssc-agent:dev"

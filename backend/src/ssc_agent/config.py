@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,6 +53,22 @@ class Settings(BaseSettings):
     )
     kubernetes_shell_concurrency: int = Field(
         default=4, ge=1, le=16, validation_alias="KUBERNETES_SHELL_CONCURRENCY"
+    )
+    workspace_dir: str = Field(
+        default="/workspace",
+        validation_alias=AliasChoices("WORKSPACE_DIR", "WORKSPACE_PATH"),
+    )
+    workspace_pvc: str = Field(
+        default="workspace-storage",
+        validation_alias=AliasChoices("WORKSPACE_PVC", "KUBERNETES_SHELL_WORKSPACE_PVC"),
+    )
+    kubernetes_shell_workspace_mount_path: str = Field(
+        default="/workspace",
+        validation_alias="KUBERNETES_SHELL_WORKSPACE_MOUNT_PATH",
+    )
+    kubernetes_shell_working_dir: str = Field(
+        default="/workspace",
+        validation_alias="KUBERNETES_SHELL_WORKING_DIR",
     )
 
     msal_tenant_id: str = Field(

@@ -49,6 +49,28 @@ class KubernetesShellTool:
 
     def pod(self, name: str, command: str) -> dict:
         settings = self.settings
+        volume_mounts = [{"name": "tmp", "mountPath": "/tmp"}]
+        volumes = [{"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}}]
+        if settings.workspace_pvc:
+            volume_mounts.append(
+                {
+                    "name": "workspace",
+                    "mountPath": settings.kubernetes_shell_workspace_mount_path,
+                }
+            )
+            volumes.append(
+                {
+                    "name": "workspace",
+                    "persistentVolumeClaim": {"claimName": settings.workspace_pvc},
+                }
+            )
+
+        working_dir = (
+            settings.kubernetes_shell_working_dir
+            if settings.workspace_pvc
+            else "/tmp"
+        )
+
         return {
             "apiVersion": "v1",
             "kind": "Pod",
@@ -74,7 +96,7 @@ class KubernetesShellTool:
                         "name": "shell",
                         "image": settings.kubernetes_shell_image,
                         "imagePullPolicy": "IfNotPresent",
-                        "workingDir": "/tmp",
+                        "workingDir": working_dir,
                         "command": [
                             "/usr/bin/timeout",
                             "--signal=KILL",
@@ -87,6 +109,10 @@ class KubernetesShellTool:
                             {"name": "HOME", "value": "/tmp"},
                             {"name": "DOTNET_CLI_HOME", "value": "/tmp"},
                             {"name": "DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "value": "1"},
+                            {
+                                "name": "WORKSPACE_DIR",
+                                "value": settings.kubernetes_shell_workspace_mount_path,
+                            },
                         ],
                         "securityContext": {
                             "allowPrivilegeEscalation": False,
@@ -97,10 +123,10 @@ class KubernetesShellTool:
                             "requests": {"cpu": "100m", "memory": "128Mi"},
                             "limits": {"cpu": "1", "memory": "512Mi", "ephemeral-storage": "256Mi"},
                         },
-                        "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}],
+                        "volumeMounts": volume_mounts,
                     }
                 ],
-                "volumes": [{"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}}],
+                "volumes": volumes,
             },
         }
 
@@ -165,13 +191,18 @@ class KubernetesShellTool:
                     logger.exception("Sandbox deletion failed; scheduled cleanup will retry")
 
     def as_function(self) -> FunctionTool:
+        mount_path = self.settings.kubernetes_shell_workspace_mount_path
         return tool(
             func=self.run,
             name="run_shell",
             approval_mode="never_require",
-            description="Run a shell command in a fresh offline Kubernetes pod. "
-            "Only /tmp is writable. Files are deleted after each invocation. "
-            "Combine related commands in one invocation. The image includes .NET 8.",
+            description=(
+                "Run a shell command in an isolated offline Kubernetes pod. "
+                f"The shared workspace is mounted at {mount_path} and is the working directory. "
+                "Only /tmp and the workspace are writable. "
+                "The environment includes the .NET 8 SDK for building, running, and testing code. "
+                "Combine related commands in one invocation."
+            ),
             kind="shell",
         )
 

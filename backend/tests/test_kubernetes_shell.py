@@ -58,9 +58,45 @@ def test_output_exit_status_and_pod_removal(exit_code):
         assert container["securityContext"]["readOnlyRootFilesystem"]
         assert container["command"][-1] == "echo output; echo 'error output' >&2"
         assert container["command"][0] == "/usr/bin/timeout"
-        assert pod["volumes"] == [{"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}}]
+        assert container["workingDir"] == "/workspace"
+        assert container["volumeMounts"] == [
+            {"name": "tmp", "mountPath": "/tmp"},
+            {"name": "workspace", "mountPath": "/workspace"},
+        ]
+        assert pod["volumes"] == [
+            {"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}},
+            {"name": "workspace", "persistentVolumeClaim": {"claimName": "workspace-storage"}},
+        ]
 
     asyncio.run(scenario())
+
+
+def test_pod_without_workspace_pvc():
+    shell = KubernetesShellTool(settings(workspace_pvc=""))
+    pod = shell.pod("test-pod", "echo hello")["spec"]
+    assert pod["volumes"] == [{"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}}]
+    assert pod["containers"][0]["volumeMounts"] == [{"name": "tmp", "mountPath": "/tmp"}]
+    assert pod["containers"][0]["workingDir"] == "/tmp"
+
+
+def test_pod_with_custom_workspace_settings():
+    shell = KubernetesShellTool(
+        settings(
+            workspace_pvc="custom-pvc",
+            kubernetes_shell_workspace_mount_path="/custom-space",
+            kubernetes_shell_working_dir="/custom-space/app",
+        )
+    )
+    pod = shell.pod("test-pod", "dotnet build")["spec"]
+    assert pod["volumes"] == [
+        {"name": "tmp", "emptyDir": {"sizeLimit": "128Mi"}},
+        {"name": "workspace", "persistentVolumeClaim": {"claimName": "custom-pvc"}},
+    ]
+    assert pod["containers"][0]["volumeMounts"] == [
+        {"name": "tmp", "mountPath": "/tmp"},
+        {"name": "workspace", "mountPath": "/custom-space"},
+    ]
+    assert pod["containers"][0]["workingDir"] == "/custom-space/app"
 
 
 def test_cancellation_removes_pod():

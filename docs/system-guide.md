@@ -232,7 +232,7 @@ the user to approve each command.
 4. Kubernetes schedules it on a node labeled `ssc-agent.local/offline-sandbox=true`.
    The node pulls the image if it is missing, then starts the container with the
    offline seccomp profile already active.
-5. Execute `/usr/bin/timeout --signal=KILL <seconds> /bin/sh -c <command>` in `/tmp`.
+5. Execute `/usr/bin/timeout --signal=KILL <seconds> /bin/sh -c <command>` in the workspace directory (default `/workspace`).
 6. Poll the Pod API every 0.5 seconds until the pod succeeds or fails.
 7. Read the shell container's termination status and up to 65,536 bytes of logs.
    Return a text result containing its exit code and combined stdout/stderr.
@@ -256,7 +256,8 @@ There is no fallback to host execution when Kubernetes is unavailable.
 | CPU | 100m request, 1 CPU limit | Scheduling reservation and execution limit |
 | Memory | 128 MiB request, 512 MiB limit | Scheduling reservation and container memory limit |
 | Ephemeral storage | 256 MiB limit | Pod container/log storage budget |
-| `/tmp` | 128 MiB `emptyDir` size limit | Writable temporary workspace |
+| `/tmp` | 128 MiB `emptyDir` size limit | Writable temporary storage |
+| Workspace | 5 GiB `workspace-storage` PVC | Shared persistent space for code and build artifacts |
 | Output | Up to 64 KiB | From the beginning of the log; no live subprocess-output stream |
 | Namespace quota | 16 pods; 2 CPU/2 GiB requests; 16 CPU/8 GiB limits | Aggregate sandbox workload budget |
 
@@ -266,21 +267,14 @@ total time from tool submission to return. Exit code 137 can result from the
 configured kill timeout or other kills such as an out-of-memory condition; it is
 not by itself proof of one particular cause.
 
-### Files are scoped to one invocation
+### Shared workspace and execution environment
 
-The default image is `mcr.microsoft.com/dotnet/sdk:8.0`. It supplies the SDK,
-`/bin/sh`, and GNU timeout. The working directory, `HOME`, and `DOTNET_CLI_HOME`
-are `/tmp`. No repository checkout, host directory, or persistent volume is mounted.
-
-Commands that need the same files must be combined in one invocation:
-
-```sh
-printf 'hello\n' > /tmp/message.txt && cat /tmp/message.txt
-```
-
-A later invocation cannot read that file. Offline package restore, Git fetches,
-and IP-based test servers will fail unless the operation can use already supplied
-files and avoid network sockets. This includes localhost TCP/UDP listeners.
+The default image is `mcr.microsoft.com/dotnet/sdk:8.0`. It supplies the .NET 8 SDK,
+`/bin/sh`, and GNU timeout. The working directory is the shared workspace (mounted at
+`/workspace` by default), while `HOME` and `DOTNET_CLI_HOME` are `/tmp`.
+Files in the workspace persist across tool calls and pod invocations, allowing the
+agent service (via `write_file`, `read_file`, `list_files`, `delete_file`) and the sandbox
+to collaborate on creating, building, running, and testing code projects.
 
 ## 6. Why the sandbox is offline
 

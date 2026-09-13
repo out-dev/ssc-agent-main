@@ -8,6 +8,7 @@ from azure.identity.aio import DefaultAzureCredential
 from .config import Settings
 from .kubernetes_shell import KubernetesShellTool
 from .memory import CogneeClient, CogneeMemoryProvider
+from .workspace import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,10 @@ AGENT_PROFILES = {
         "name": "ssc-coding-agent",
         "suffix": (
             " Focus on software engineering tasks, explain implementation trade-offs, "
-            "and prefer practical, verifiable solutions."
+            "and prefer practical, verifiable solutions. You have access to a shared workspace "
+            "and an isolated sandbox shell. You can create, read, and edit project files, "
+            "and run shell commands in the sandbox to build, run, test (.NET 8 CLI), "
+            "and debug projects."
         ),
     },
 }
@@ -36,6 +40,7 @@ class AgentService:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        self._workspace = WorkspaceManager(settings.workspace_dir)
         self._memory = CogneeClient(settings) if settings.cognee_enabled else None
         self._credential: DefaultAzureCredential | None = None
         self._client: FoundryChatClient | None = None
@@ -45,6 +50,10 @@ class AgentService:
         self._sessions: dict[str, AgentSession] = {}
         self._initialization_lock = asyncio.Lock()
         self._session_lock = asyncio.Lock()
+
+    @property
+    def workspace(self) -> WorkspaceManager:
+        return self._workspace
 
     def _create_agent(self, agent_id: str) -> Agent:
         profile = AGENT_PROFILES.get(agent_id)
@@ -61,7 +70,7 @@ class AgentService:
                 credential=self._credential,
             )
 
-        tools = None
+        tools = list(self._workspace.get_tools())
         if self._settings.kubernetes_shell_enabled:
             if self._shell is None:
                 try:
@@ -75,13 +84,13 @@ class AgentService:
                     )
                     self._shell = None
             if self._shell is not None:
-                tools = [self._client.get_shell_tool(func=self._shell.as_function())]
+                tools.append(self._client.get_shell_tool(func=self._shell.as_function()))
 
         agent = Agent(
             client=self._client,
             name=profile["name"],
             instructions=self._settings.foundry_instructions + profile["suffix"],
-            tools=tools,
+            tools=tools if tools else None,
             context_providers=(
                 [CogneeMemoryProvider(self._memory, source_id=f"cognee-memory-{agent_id}")]
                 if self._memory is not None

@@ -29,6 +29,8 @@ foreach ($nodeName in $clusterNodes) {
     Invoke-Checked podman @("exec", $nodeName, "mkdir", "-p", "/var/lib/kubelet/seccomp")
     Get-Content -Raw deploy/kind/seccomp-offline.json | & podman exec -i $nodeName sh -c 'cat > /var/lib/kubelet/seccomp/ssc-offline.json'
     if ($LASTEXITCODE -ne 0) { throw "Could not install the offline seccomp profile on $nodeName." }
+    Invoke-Checked podman @("exec", $nodeName, "mkdir", "-p", "/var/lib/ssc-workspace")
+    Invoke-Checked podman @("exec", $nodeName, "chmod", "777", "/var/lib/ssc-workspace")
     Invoke-Checked $kubectlPath @("--context", $targetContext, "label", "node", $nodeName, "ssc-agent.local/offline-sandbox=true", "--overwrite")
 }
 foreach ($imageName in @("localhost/ssc-agent:dev", "localhost/ssc-agent-cognee:dev")) {
